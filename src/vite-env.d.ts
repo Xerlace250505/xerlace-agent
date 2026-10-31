@@ -12,6 +12,7 @@ declare global {
   }
 
   interface Window {
+    xerlace?: DesktopApi;
     bloxbot?: DesktopApi;
   }
 }

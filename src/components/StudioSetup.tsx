@@ -35,7 +35,7 @@ const STEPS = [
 
 const PROBLEM_COPY: Record<StudioMcpProblem, string> = {
   not_installed:
-    "BloxBot can't find Roblox Studio's MCP helper. Install or update Roblox Studio, open it, turn on the MCP server in Assistant settings, then check again.",
+    "Xerlace Agent can't find Roblox Studio's MCP helper. Install or update Roblox Studio, open it, turn on the MCP server in Assistant settings, then check again.",
   unavailable:
     "Studio's MCP helper stopped right after it started. Open Roblox Studio so it can finish any update, then check again. If this keeps happening, reinstall Studio.",
 };
@@ -74,7 +74,7 @@ function StudioSetup({ connected, checking, problem, onCheck, onContinue }: Stud
           </div>
           <h1 className="mt-5 font-serif text-3xl italic">Studio connected</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            BloxBot is in the driver&apos;s seat. You&apos;re ready to build.
+            Xerlace Agent is in the driver&apos;s seat. You&apos;re ready to build.
           </p>
           <button
             type="button"

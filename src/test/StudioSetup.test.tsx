@@ -74,7 +74,7 @@ describe("StudioSetup", () => {
     );
 
     expect(screen.getByRole("status")).toHaveTextContent(
-      "BloxBot can't find Roblox Studio's MCP helper. Install or update Roblox Studio, open it, turn on the MCP server in Assistant settings, then check again.",
+      "Xerlace Agent can't find Roblox Studio's MCP helper. Install or update Roblox Studio, open it, turn on the MCP server in Assistant settings, then check again.",
     );
     expect(screen.queryByText("Looking for Roblox Studio")).toBeNull();
 

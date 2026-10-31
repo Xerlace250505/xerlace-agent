@@ -91,11 +91,11 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       setDetailedAnalyticsEnabledState(enabled);
       setDetailedAnalyticsCollection(enabled);
       if (enabled) {
-        toast("BloxBot shares AI usage data", {
+        toast("Xerlace Agent shares AI usage data", {
           id: "analytics-optout-notice",
           className: "analytics-consent-toast",
           description:
-            "Your chats and tool activity help improve BloxBot. Details in Settings → Privacy.",
+            "Your chats and tool activity help improve Xerlace Agent. Details in Settings → Privacy.",
           duration: Number.POSITIVE_INFINITY,
           action: {
             label: "Got it",

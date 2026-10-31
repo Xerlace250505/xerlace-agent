@@ -55,4 +55,5 @@ const api: DesktopApi = {
     ipcRenderer.invoke(channels.testCustomEndpoint, { baseUrl, apiKey }),
 };
 
+contextBridge.exposeInMainWorld("xerlace", api);
 contextBridge.exposeInMainWorld("bloxbot", api);

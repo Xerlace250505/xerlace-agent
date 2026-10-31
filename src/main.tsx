@@ -31,11 +31,11 @@ if (import.meta.env.PROD && POSTHOG_PROJECT_TOKEN) {
     $current_url: "bloxbot://app/loading",
     $host: "app",
     $pathname: "/loading",
-    app: "bloxbot",
+    app: "xerlace-agent",
     analytics_schema_version: ANALYTICS_SCHEMA_VERSION,
     analytics_detail_enabled: false,
     app_platform: navigator.platform,
-    app_runtime: window.bloxbot ? "electron" : "browser",
+    app_runtime: (window.xerlace ?? window.bloxbot) ? "electron" : "browser",
     app_screen: "loading",
     app_user_agent: navigator.userAgent,
   });

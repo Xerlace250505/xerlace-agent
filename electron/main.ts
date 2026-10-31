@@ -471,7 +471,7 @@ function createWindow(): Effect.Effect<void, DesktopMainError> {
     const window = yield* Effect.try({
       try: () =>
         new BrowserWindow({
-          title: "BloxBot",
+          title: "Xerlace Agent",
           width: 920,
           height: 600,
           minWidth: 520,
@@ -492,7 +492,7 @@ function createWindow(): Effect.Effect<void, DesktopMainError> {
     yield* Effect.sync(() => {
       mainWindow = window;
       window.webContents.setUserAgent(
-        `${window.webContents.getUserAgent()} BloxBot/${app.getVersion()}`,
+        `${window.webContents.getUserAgent()} Xerlace-Agent/${app.getVersion()}`,
       );
       window.webContents.setWindowOpenHandler(({ url }) => {
         Effect.runFork(

@@ -11,7 +11,7 @@ describe("browser desktop fallback", () => {
     const { desktop } = await import("@/lib/desktop");
 
     await expect(desktop.getOpenCodeInfo()).rejects.toThrow(
-      "The desktop service is unavailable. Start BloxBot with pnpm dev.",
+      "The desktop service is unavailable. Start Xerlace Agent with pnpm dev.",
     );
   });
 

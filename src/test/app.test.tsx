@@ -239,7 +239,7 @@ describe("User journeys", () => {
 
     render(<TestApp client={client} queryClient={queryClient} />);
 
-    const noticeTitle = await screen.findByText("BloxBot shares AI usage data");
+    const noticeTitle = await screen.findByText("Xerlace Agent shares AI usage data");
     expect(noticeTitle).toBeVisible();
     expect(noticeTitle.closest("[data-sonner-toast]")).toHaveClass("analytics-consent-toast");
     await expect(desktop.loadConfig()).resolves.toMatchObject({
@@ -271,7 +271,7 @@ describe("User journeys", () => {
     await waitFor(() =>
       expect(desktop.loadConfig()).resolves.toMatchObject({ analyticsNoticeVersion: 2 }),
     );
-    expect(screen.queryByText("BloxBot shares AI usage data")).not.toBeInTheDocument();
+    expect(screen.queryByText("Xerlace Agent shares AI usage data")).not.toBeInTheDocument();
     await expect(desktop.loadConfig()).resolves.toMatchObject({
       detailedAnalytics: "disabled",
       analyticsNoticeVersion: 2,
@@ -287,7 +287,7 @@ describe("User journeys", () => {
 
     fireEvent.click(await screen.findByText("Settings"));
     fireEvent.click(await screen.findByRole("button", { name: "Privacy" }));
-    expect(screen.queryByText("BloxBot shares AI usage data")).not.toBeInTheDocument();
+    expect(screen.queryByText("Xerlace Agent shares AI usage data")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute(
       "href",
       "https://bloxbot.ai/privacy",

@@ -109,7 +109,7 @@ const browserEffects: DesktopEffects = {
     Effect.fail(new DesktopError({ message: "Explorer requires the desktop app." })),
   getOpenCodeInfo: Effect.fail(
     new DesktopError({
-      message: "The desktop service is unavailable. Start BloxBot with pnpm dev.",
+      message: "The desktop service is unavailable. Start Xerlace Agent with pnpm dev.",
     }),
   ),
   getOpenCodeInstallFolder: Effect.succeed(null),
@@ -267,8 +267,10 @@ function makeBridgeEffects(api: DesktopApi): DesktopEffects {
   };
 }
 
-export const desktopEffects: DesktopEffects = window.bloxbot
-  ? makeBridgeEffects(window.bloxbot)
+const bridgeApi = window.xerlace ?? window.bloxbot;
+
+export const desktopEffects: DesktopEffects = bridgeApi
+  ? makeBridgeEffects(bridgeApi)
   : browserEffects;
 
 const runPromise = <A>(effect: Effect.Effect<A, DesktopError>): Promise<A> =>
@@ -281,7 +283,7 @@ export const desktop: DesktopApi = {
   getOpenCodeInstallFolder: () => runPromise(desktopEffects.getOpenCodeInstallFolder),
   getStudioMcpStatus: () => runPromise(desktopEffects.getStudioMcpStatus),
   onOpenCodeStartupProgress: (listener: StartupProgressListener) =>
-    window.bloxbot?.onOpenCodeStartupProgress(listener) ?? (() => {}),
+    (window.xerlace ?? window.bloxbot)?.onOpenCodeStartupProgress(listener) ?? (() => {}),
   getVersion: () => runPromise(desktopEffects.getVersion),
   getInstructionFiles: () => runPromise(desktopEffects.getInstructionFiles),
   openUrl: (url) => runPromise(desktopEffects.openUrl(url)),
@@ -300,8 +302,9 @@ export const desktop: DesktopApi = {
     runPromise(desktopEffects.selectStudioTarget(programs, targetKey)),
   getBloxBotPrograms: () => runPromise(desktopEffects.getBloxBotPrograms),
   onBloxBotProgramsUpdated: (listener) =>
-    window.bloxbot?.onBloxBotProgramsUpdated(listener) ?? (() => {}),
-  onMainError: (listener) => window.bloxbot?.onMainError(listener) ?? (() => {}),
+    (window.xerlace ?? window.bloxbot)?.onBloxBotProgramsUpdated(listener) ?? (() => {}),
+  onMainError: (listener) =>
+    (window.xerlace ?? window.bloxbot)?.onMainError(listener) ?? (() => {}),
   testCustomEndpoint: (baseUrl, apiKey) =>
     runPromise(desktopEffects.testCustomEndpoint(baseUrl, apiKey)),
 };
