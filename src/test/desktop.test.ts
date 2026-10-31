@@ -28,6 +28,7 @@ describe("browser desktop fallback", () => {
       analyticsNoticeVersion: 0,
       studioTargetPrograms: null,
       studioTargetsBySession: {},
+      customProviders: [],
     });
   });
 
@@ -46,6 +47,7 @@ describe("browser desktop fallback", () => {
       analyticsNoticeVersion: 0,
       studioTargetPrograms: null,
       studioTargetsBySession: {},
+      customProviders: [],
     });
   });
 
@@ -62,6 +64,7 @@ describe("browser desktop fallback", () => {
       analyticsNoticeVersion: 0,
       studioTargetPrograms: null,
       studioTargetsBySession: {},
+      customProviders: [],
     });
   });
 

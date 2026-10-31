@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { rename, readFile, rm, writeFile } from "node:fs/promises";
 import { userInfo } from "node:os";
 import { dirname, join } from "node:path";
@@ -12,6 +13,7 @@ import {
   AppConfigPatchSchema,
   AppConfigSchema,
   DEFAULT_APP_CONFIG,
+  type CustomProvider,
   type OpenCodeStartupProgress,
 } from "../src/types/desktop";
 import { ExplorerProgramEnvelopeSchema, ExplorerSnapshotSchema } from "../src/lib/explorer";
@@ -93,11 +95,38 @@ const studioMcpBrokerLayer = makeStudioMcpBrokerLayer({
 
 const openCodeBinaryDirectory = join(app.getPath("userData"), "opencode");
 
+/** Reads the stored custom providers synchronously at startup (best-effort). */
+function loadCustomProvidersSync(): CustomProvider[] {
+  try {
+    const raw = readFileSync(configPath(), "utf8");
+    const parsed = JSON.parse(raw) as unknown;
+    if (parsed !== null && typeof parsed === "object" && "customProviders" in parsed) {
+      const candidate = (parsed as Record<string, unknown>)["customProviders"];
+      if (Array.isArray(candidate)) {
+        // Basic structural check — we'll rely on the full Schema decode in loadConfig.
+        return candidate.filter(
+          (item): item is CustomProvider =>
+            item !== null &&
+            typeof item === "object" &&
+            typeof (item as Record<string, unknown>)["id"] === "string" &&
+            typeof (item as Record<string, unknown>)["baseUrl"] === "string" &&
+            Array.isArray((item as Record<string, unknown>)["models"]) &&
+            typeof (item as Record<string, unknown>)["enabled"] === "boolean",
+        );
+      }
+    }
+  } catch {
+    // File doesn't exist yet or is corrupt — ignore and use defaults.
+  }
+  return [];
+}
+
 const openCodeRuntime = ManagedRuntime.make(
   Layer.merge(
     makeOpenCodeLayer({
       binaryCacheDirectory: openCodeBinaryDirectory,
       workspace: join(app.getPath("home"), "BloxBot"),
+      customProviders: loadCustomProvidersSync(),
       onStartupProgress: (progress: OpenCodeStartupProgress) => {
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send(channels.openCodeStartupProgress, progress);
@@ -388,6 +417,52 @@ const registerIpcHandlers = Effect.sync(() => {
         app.quit();
       }),
     ),
+  );
+  ipcMain.handle(
+    channels.testCustomEndpoint,
+    (_event, { baseUrl, apiKey }: { baseUrl: string; apiKey: string }) =>
+      runMain(
+        Effect.tryPromise({
+          try: async () => {
+            const cleanBase = (baseUrl || "").trim().replace(/\/+$/, "");
+            if (!cleanBase) return { ok: false, error: "Base URL is required" };
+            const url = `${cleanBase}/models`;
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 10000);
+            try {
+              const res = await fetch(url, {
+                method: "GET",
+                headers: apiKey?.trim() ? { Authorization: `Bearer ${apiKey.trim()}` } : {},
+                signal: controller.signal,
+              });
+              if (!res.ok) {
+                const text = await res.text().catch(() => "");
+                return {
+                  ok: false,
+                  error: `HTTP ${res.status}: ${res.statusText}${text ? ` - ${text.slice(0, 150)}` : ""}`,
+                };
+              }
+              const json = (await res.json()) as { data?: Array<{ id?: string }> };
+              const models = Array.isArray(json?.data)
+                ? json.data
+                    .map((m) => m?.id)
+                    .filter((id): id is string => typeof id === "string" && id.trim() !== "")
+                : [];
+              return { ok: true, models };
+            } finally {
+              clearTimeout(timeout);
+            }
+          },
+          catch: (cause) =>
+            new DesktopMainError({
+              message: cause instanceof Error ? cause.message : "Connection failed",
+            }),
+        }).pipe(
+          Effect.catchAll((err) =>
+            Effect.succeed({ ok: false, error: err.message || "Connection failed" }),
+          ),
+        ),
+      ),
   );
 });
 

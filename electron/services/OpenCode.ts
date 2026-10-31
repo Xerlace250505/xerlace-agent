@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { Context, Data, Duration, Effect, Layer } from "effect";
 import { networkConnections, type Systeminformation } from "systeminformation";
 
-import type { OpenCodeInfo, OpenCodeStartupProgress } from "../../src/types/desktop";
+import type { CustomProvider, OpenCodeInfo, OpenCodeStartupProgress } from "../../src/types/desktop";
 import { createOpenCodeConfig } from "../opencodeConfig";
 import { ensureOpenCodeBinary } from "./OpenCodeBinary";
 import { StudioMcpBroker } from "./StudioMcpBroker";
@@ -115,6 +115,7 @@ interface PreparedOpenCode {
 export interface OpenCodeOptions {
   binaryCacheDirectory: string;
   workspace: string;
+  customProviders?: CustomProvider[];
   onStartupProgress?: (progress: OpenCodeStartupProgress) => void;
 }
 
@@ -296,7 +297,7 @@ function prepareOpenCode(
       ),
       { concurrency: "unbounded", discard: true },
     );
-    const config = createOpenCodeConfig(broker.info);
+    const config = createOpenCodeConfig(broker.info, options.customProviders ?? []);
     yield* fileOperation("Failed to write the OpenCode configuration", () =>
       writeFile(
         join(configDirectory, "opencode.json"),

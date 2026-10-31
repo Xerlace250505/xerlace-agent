@@ -1,6 +1,7 @@
 import { win32 } from "node:path";
 
 import { STUDIO_MCP_SERVER_NAME } from "../src/lib/bloxbotProgramManifest";
+import type { CustomProvider } from "../src/types/desktop";
 
 export interface StudioMcpWindowsEnvironment {
   localAppData?: string;
@@ -42,7 +43,38 @@ export function studioMcpInstallPath(
   return null;
 }
 
-export function createOpenCodeConfig(broker: { url: string }) {
+export function createOpenCodeConfig(
+  broker: { url: string },
+  customProviders: CustomProvider[] = [],
+) {
+  // Build providers object from enabled custom providers.
+  const providers: Record<string, unknown> = {};
+  for (const cp of customProviders.filter(
+    (p) => p.enabled && p.baseUrl.trim() !== "" && p.models.length > 0,
+  )) {
+    providers[cp.id] = {
+      name: cp.name,
+      npm: "@ai-sdk/openai-compatible",
+      options: {
+        baseURL: cp.baseUrl.trim().replace(/\/+$/, ""),
+        apiKey: cp.apiKey,
+      },
+      models: Object.fromEntries(
+        cp.models.map((modelId) => [
+          modelId,
+          {
+            name: modelId,
+            capabilities: {
+              toolcall: true,
+              input: { text: true },
+              output: { text: true },
+            },
+          },
+        ]),
+      ),
+    };
+  }
+
   return {
     // Keep OpenCode's standard automatic context compaction enabled for long sessions.
     compaction: {
@@ -65,5 +97,6 @@ export function createOpenCodeConfig(broker: { url: string }) {
           "Use Studio MCP directly. Inspect before editing; never guess what MCP can read. Discover Studios when needed, choose by Studio ID and Place ID, and pass studio_id on every Studio-specific tool call; never call set_active_studio. Make the smallest coherent change, preserve Luau conventions, verify through reinspection and the most relevant Studio check, and report briefly. If Studio is unavailable, give one reconnect instruction, then stop retrying.",
       },
     },
+    ...(Object.keys(providers).length > 0 ? { provider: providers } : {}),
   };
 }

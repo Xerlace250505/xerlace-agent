@@ -21,4 +21,5 @@ export const channels = {
   bloxbotProgramsUpdated: "bloxbot-programs:updated",
   mainError: "app:main-error",
   mainErrorReady: "app:main-error-ready",
+  testCustomEndpoint: "custom-provider:test-endpoint",
 } as const;

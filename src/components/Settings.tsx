@@ -1,5 +1,5 @@
 import type { Model } from "@opencode-ai/sdk/v2/client";
-import { Search, Sparkles } from "lucide-react";
+import { AlertCircle, Check, Loader2, Search, Sparkles } from "lucide-react";
 import posthog from "posthog-js/dist/module.full.no-external.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -23,7 +23,7 @@ import { connectHint, isFreeTier, providerDisplayName } from "@/lib/providerAuth
 import { checkModels, checkPreference, type ProviderCheckResult } from "@/lib/providerCheck";
 import { usePreferences } from "@/providers/PreferencesProvider";
 import type { ModelInfo, ProviderInfo } from "@/types";
-import type { UpdateInfo } from "@/types/desktop";
+import type { CustomProvider, UpdateInfo } from "@/types/desktop";
 
 // ── Popular providers (same order as OpenCode's web UI) ──────────────
 const POPULAR_PROVIDERS = [
@@ -59,7 +59,7 @@ const TECHNOLOGIES = [
   },
 ];
 
-type SettingsTab = "providers" | "models" | "appearance" | "privacy" | "about";
+type SettingsTab = "providers" | "models" | "appearance" | "privacy" | "about" | "custom-providers";
 
 interface SettingsProps {
   onClose: () => void;
@@ -131,6 +131,28 @@ function Settings({ onClose }: SettingsProps) {
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
             </svg>
             Providers
+          </button>
+          <button
+            onClick={() => setTab("custom-providers")}
+            className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-1.5 text-left text-xs transition-colors @xl:mx-1.5 ${
+              tab === "custom-providers"
+                ? "bg-accent font-medium text-foreground"
+                : "text-muted-foreground hover:bg-accent hover:text-foreground"
+            }`}
+          >
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Custom APIs
           </button>
           <button
             onClick={() => setTab("models")}
@@ -233,6 +255,7 @@ function Settings({ onClose }: SettingsProps) {
         {/* Content area */}
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           {tab === "providers" && <ProvidersTab />}
+          {tab === "custom-providers" && <CustomProvidersTab />}
           {tab === "models" && <ModelsTab />}
           {tab === "appearance" && <AppearanceTab />}
           {tab === "privacy" && <PrivacyTab />}
@@ -588,7 +611,7 @@ function ProvidersTab() {
 
       {nothingMatches && (
         <div className="mt-8 text-center text-xs text-muted-foreground">
-          No provider matches “{query.trim()}”.
+          No provider matches "{query.trim()}".
           <button
             onClick={() => setQuery("")}
             className="ml-1 text-foreground underline-offset-2 hover:underline"
@@ -610,6 +633,540 @@ function ProvidersTab() {
           onClose={() => setConnecting(null)}
           onConnected={handleConnected}
         />
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Custom Providers Tab — OpenAI-compatible custom API endpoints
+// ═══════════════════════════════════════════════════════════════════════
+
+interface CustomProviderFormState {
+  name: string;
+  baseUrl: string;
+  apiKey: string;
+  models: string;
+  enabled: boolean;
+}
+
+interface ProviderPreset {
+  label: string;
+  name: string;
+  baseUrl: string;
+  models: string;
+}
+
+const PRESETS: ProviderPreset[] = [
+  {
+    label: "DeepSeek",
+    name: "DeepSeek",
+    baseUrl: "https://api.deepseek.com/v1",
+    models: "deepseek-chat, deepseek-coder, deepseek-reasoner",
+  },
+  {
+    label: "Groq",
+    name: "Groq Cloud",
+    baseUrl: "https://api.groq.com/openai/v1",
+    models: "llama-3.3-70b-versatile, llama-3.1-8b-instant",
+  },
+  {
+    label: "OpenRouter",
+    name: "OpenRouter",
+    baseUrl: "https://openrouter.ai/api/v1",
+    models: "anthropic/claude-3.5-sonnet, openai/gpt-4o",
+  },
+  {
+    label: "Ollama",
+    name: "Ollama Local",
+    baseUrl: "http://localhost:11434/v1",
+    models: "llama3.2, qwen2.5-coder",
+  },
+  {
+    label: "Together",
+    name: "Together AI",
+    baseUrl: "https://api.together.xyz/v1",
+    models: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+  },
+];
+
+const EMPTY_FORM: CustomProviderFormState = {
+  name: "",
+  baseUrl: "",
+  apiKey: "",
+  models: "",
+  enabled: true,
+};
+
+function providerToForm(cp: CustomProvider): CustomProviderFormState {
+  return {
+    name: cp.name,
+    baseUrl: cp.baseUrl,
+    apiKey: cp.apiKey,
+    models: cp.models.join(", "),
+    enabled: cp.enabled,
+  };
+}
+
+function parseModels(raw: string): string[] {
+  return raw
+    .split(/[\n,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function isValidUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function showRestartToast() {
+  toast("Restart required", {
+    description: "Custom provider changes take effect after a restart.",
+    duration: Number.POSITIVE_INFINITY,
+    action: {
+      label: "Restart Now",
+      onClick: () => desktop.relaunch().catch(() => {}),
+    },
+  });
+}
+
+function CustomProvidersTab() {
+  const { customProviders, addCustomProvider, updateCustomProvider, removeCustomProvider } =
+    usePreferences();
+
+  // null = closed, "new" = adding, string id = editing
+  const [editingId, setEditingId] = useState<string | "new" | null>(null);
+  const [form, setForm] = useState<CustomProviderFormState>(EMPTY_FORM);
+  const [errors, setErrors] = useState<Partial<Record<keyof CustomProviderFormState, string>>>({});
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{
+    ok: boolean;
+    models?: string[];
+    error?: string;
+  } | null>(null);
+
+  function applyPreset(preset: ProviderPreset) {
+    setForm((f) => ({
+      ...f,
+      name: f.name.trim() ? f.name : preset.name,
+      baseUrl: preset.baseUrl,
+      models: f.models.trim() ? f.models : preset.models,
+    }));
+    setTestResult(null);
+    setErrors({});
+  }
+
+  async function handleTest() {
+    if (!form.baseUrl.trim()) {
+      setErrors((errs) => ({ ...errs, baseUrl: "Base URL is required to test" }));
+      return;
+    }
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await desktop.testCustomEndpoint(form.baseUrl, form.apiKey);
+      setTestResult(res);
+      if (res.ok && res.models && res.models.length > 0 && !form.models.trim()) {
+        setForm((f) => ({ ...f, models: res.models!.join(", ") }));
+      }
+    } catch (cause) {
+      setTestResult({
+        ok: false,
+        error: cause instanceof Error ? cause.message : "Connection failed",
+      });
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  function handleAutoFillModels(models: string[]) {
+    setForm((f) => ({ ...f, models: models.join(", ") }));
+    setErrors((e) => ({ ...e, models: undefined }));
+  }
+
+  function openNew() {
+    setForm(EMPTY_FORM);
+    setErrors({});
+    setTestResult(null);
+    setTesting(false);
+    setEditingId("new");
+  }
+
+  function openEdit(cp: CustomProvider) {
+    setForm(providerToForm(cp));
+    setErrors({});
+    setTestResult(null);
+    setTesting(false);
+    setEditingId(cp.id);
+  }
+
+  function closeForm() {
+    setEditingId(null);
+    setErrors({});
+    setTestResult(null);
+    setTesting(false);
+  }
+
+  function validate(): boolean {
+    const errs: Partial<Record<keyof CustomProviderFormState, string>> = {};
+    if (!form.name.trim()) errs.name = "Name is required";
+    if (!form.baseUrl.trim()) {
+      errs.baseUrl = "Base URL is required";
+    } else if (!isValidUrl(form.baseUrl.trim())) {
+      errs.baseUrl = "Must be a valid http:// or https:// URL";
+    }
+    if (!form.models.trim()) errs.models = "At least one model ID is required";
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  }
+
+  function handleSave() {
+    if (!validate()) return;
+
+    const payload = {
+      name: form.name.trim(),
+      baseUrl: form.baseUrl.trim(),
+      apiKey: form.apiKey.trim(),
+      models: parseModels(form.models),
+      enabled: form.enabled,
+    };
+
+    if (editingId === "new") {
+      addCustomProvider(payload);
+    } else if (editingId) {
+      updateCustomProvider(editingId, payload);
+    }
+
+    closeForm();
+    showRestartToast();
+  }
+
+  function handleToggleEnabled(cp: CustomProvider) {
+    updateCustomProvider(cp.id, { enabled: !cp.enabled });
+    showRestartToast();
+  }
+
+  function handleDelete(id: string) {
+    setDeletingId(id);
+  }
+
+  function confirmDelete(id: string) {
+    removeCustomProvider(id);
+    setDeletingId(null);
+    if (editingId === id) closeForm();
+    showRestartToast();
+  }
+
+  const isEditing = editingId !== null;
+
+  return (
+    <div className="mx-auto w-full max-w-md px-4 py-6 @xl:px-6 @xl:py-8">
+      <h4 className="font-serif text-lg italic text-foreground">Custom APIs</h4>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Add OpenAI-compatible API providers — resellers, proxies, or self-hosted endpoints.
+        Changes take effect after a restart.
+      </p>
+
+      {/* Provider list */}
+      {customProviders.length > 0 && (
+        <div className="mt-6">
+          <div className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Configured
+          </div>
+          <div className="divide-y rounded-lg border bg-card">
+            {customProviders.map((cp) => (
+              <div key={cp.id} className="px-3 py-2.5">
+                {deletingId === cp.id ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs text-muted-foreground">
+                      Delete <span className="font-medium text-foreground">{cp.name}</span>?
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setDeletingId(null)}
+                        className="text-[11px] text-muted-foreground hover:text-foreground"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => confirmDelete(cp.id)}
+                        className="text-[11px] font-medium text-red-600 hover:text-red-700"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    {/* Enable toggle */}
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={cp.enabled}
+                      aria-label={`Toggle ${cp.name}`}
+                      onClick={() => handleToggleEnabled(cp)}
+                      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                        cp.enabled ? "bg-foreground" : "bg-border"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-3.5 w-3.5 rounded-full bg-background transition-transform ${
+                          cp.enabled ? "translate-x-4" : "translate-x-0.5"
+                        }`}
+                      />
+                    </button>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium">{cp.name}</div>
+                      <div className="truncate text-[11px] text-muted-foreground">{cp.baseUrl}</div>
+                    </div>
+
+                    <div className="flex shrink-0 gap-2">
+                      <button
+                        onClick={() => openEdit(cp)}
+                        className="text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(cp.id)}
+                        className="text-[11px] text-muted-foreground transition-colors hover:text-red-600"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Add new button */}
+      {!isEditing && (
+        <button
+          onClick={openNew}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed bg-background px-3 py-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          Add Custom Provider
+        </button>
+      )}
+
+      {/* Inline form */}
+      {isEditing && (
+        <div className="mt-6 rounded-lg border bg-card p-4">
+          <div className="mb-4 text-sm font-medium text-foreground">
+            {editingId === "new" ? "New Custom Provider" : "Edit Provider"}
+          </div>
+
+          <div className="space-y-3">
+            {/* Quick Presets */}
+            {editingId === "new" && (
+              <div>
+                <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Quick Presets
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {PRESETS.map((p) => (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => applyPreset(p)}
+                      className="rounded-md border bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Name */}
+            <div>
+              <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                Name
+              </label>
+              <input
+                type="text"
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="My OpenAI Reseller"
+                className={`h-8 w-full rounded-md border bg-background px-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring ${
+                  errors.name ? "border-red-500" : ""
+                }`}
+              />
+              {errors.name && (
+                <p className="mt-0.5 text-[11px] text-red-600">{errors.name}</p>
+              )}
+            </div>
+
+            {/* Base URL */}
+            <div>
+              <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                Base URL
+              </label>
+              <input
+                type="url"
+                value={form.baseUrl}
+                onChange={(e) => setForm((f) => ({ ...f, baseUrl: e.target.value }))}
+                placeholder="https://api.provider.com/v1"
+                className={`h-8 w-full rounded-md border bg-background px-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring ${
+                  errors.baseUrl ? "border-red-500" : ""
+                }`}
+              />
+              {errors.baseUrl && (
+                <p className="mt-0.5 text-[11px] text-red-600">{errors.baseUrl}</p>
+              )}
+            </div>
+
+            {/* API Key */}
+            <div>
+              <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                API Key
+              </label>
+              <input
+                type="password"
+                value={form.apiKey}
+                onChange={(e) => setForm((f) => ({ ...f, apiKey: e.target.value }))}
+                placeholder="sk-..."
+                className="h-8 w-full rounded-md border bg-background px-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+
+            {/* Connection Test & Auto-fetch */}
+            <div className="rounded-md border border-dashed bg-background/50 p-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  disabled={testing || !form.baseUrl.trim()}
+                  onClick={handleTest}
+                  className="inline-flex items-center gap-1.5 rounded border bg-background px-2.5 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
+                >
+                  {testing ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3 w-3 text-muted-foreground" />
+                  )}
+                  {testing ? "Testing..." : "Test Connection & Fetch Models"}
+                </button>
+
+                {testResult?.models && testResult.models.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => handleAutoFillModels(testResult.models!)}
+                    className="text-[10px] font-medium text-muted-foreground underline hover:text-foreground"
+                  >
+                    Auto-fill {testResult.models.length} Models
+                  </button>
+                )}
+              </div>
+
+              {testResult && (
+                <div className="mt-2">
+                  {testResult.ok ? (
+                    <div className="flex items-start gap-1.5 text-[11px] text-green-600">
+                      <Check className="mt-0.5 h-3 w-3 shrink-0" />
+                      <span>
+                        Connected successfully!
+                        {testResult.models && testResult.models.length > 0
+                          ? ` Found ${testResult.models.length} model(s).`
+                          : " Endpoint is reachable."}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-1.5 text-[11px] text-red-600">
+                      <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
+                      <span className="break-all">{testResult.error || "Connection failed"}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Models */}
+            <div>
+              <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                Model IDs{" "}
+                <span className="font-normal text-muted-foreground/70">
+                  (comma or newline separated)
+                </span>
+              </label>
+              <textarea
+                value={form.models}
+                onChange={(e) => setForm((f) => ({ ...f, models: e.target.value }))}
+                placeholder="gpt-4o, gpt-4-turbo"
+                rows={3}
+                className={`w-full rounded-md border bg-background px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring ${
+                  errors.models ? "border-red-500" : ""
+                }`}
+              />
+              {errors.models && (
+                <p className="mt-0.5 text-[11px] text-red-600">{errors.models}</p>
+              )}
+            </div>
+
+            {/* Enabled */}
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium text-muted-foreground">Enabled</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={form.enabled}
+                onClick={() => setForm((f) => ({ ...f, enabled: !f.enabled }))}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                  form.enabled ? "bg-foreground" : "bg-border"
+                }`}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 rounded-full bg-background transition-transform ${
+                    form.enabled ? "translate-x-4" : "translate-x-0.5"
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              onClick={closeForm}
+              className="rounded-md border px-3 py-1.5 text-[11px] transition-colors hover:bg-accent"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              className="rounded-md bg-foreground px-3 py-1.5 text-[11px] font-medium text-background transition-opacity hover:opacity-90"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      )}
+
+      {customProviders.length === 0 && !isEditing && (
+        <p className="mt-4 text-center text-[11px] text-muted-foreground">
+          No custom providers yet. Add one above.
+        </p>
       )}
     </div>
   );
@@ -1121,7 +1678,7 @@ function AboutTab({ appVersion }: { appVersion: string | null }) {
                 onClick={handleInstall}
                 className="rounded-md bg-foreground px-3 py-1 text-[11px] font-medium text-background transition-opacity hover:opacity-90"
               >
-                Install & Restart
+                Install &amp; Restart
               </button>
             </div>
           )}

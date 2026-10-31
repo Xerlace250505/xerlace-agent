@@ -51,6 +51,8 @@ const api: DesktopApi = {
     ipcRenderer.send(channels.mainErrorReady);
     return () => ipcRenderer.removeListener(channels.mainError, handleError);
   },
+  testCustomEndpoint: (baseUrl, apiKey) =>
+    ipcRenderer.invoke(channels.testCustomEndpoint, { baseUrl, apiKey }),
 };
 
 contextBridge.exposeInMainWorld("bloxbot", api);

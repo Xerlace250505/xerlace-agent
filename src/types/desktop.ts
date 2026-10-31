@@ -13,6 +13,27 @@ import {
 
 const MutableStrings = Schema.mutable(Schema.Array(Schema.String));
 
+export const CustomProviderSchema = Schema.mutable(
+  Schema.Struct({
+    id: Schema.String,
+    name: Schema.String,
+    baseUrl: Schema.String,
+    apiKey: Schema.String,
+    models: Schema.mutable(Schema.Array(Schema.String)),
+    enabled: Schema.Boolean,
+  }),
+);
+
+export type CustomProvider = typeof CustomProviderSchema.Type;
+
+export const CustomEndpointTestResultSchema = Schema.Struct({
+  ok: Schema.Boolean,
+  models: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
+  error: Schema.optional(Schema.String),
+});
+
+export type CustomEndpointTestResult = typeof CustomEndpointTestResultSchema.Type;
+
 export const ThemePreferenceSchema = Schema.Literal("light", "dark", "system");
 export const DetailedAnalyticsPreferenceSchema = Schema.Literal("unset", "enabled", "disabled");
 
@@ -28,6 +49,7 @@ export const AppConfigSchema = Schema.mutable(
     analyticsNoticeVersion: Schema.Number,
     studioTargetPrograms: Schema.NullOr(StudioTargetProgramsSchema),
     studioTargetsBySession: Schema.Record({ key: Schema.String, value: StudioTargetSchema }),
+    customProviders: Schema.mutable(Schema.Array(CustomProviderSchema)),
   }),
 );
 
@@ -41,6 +63,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   analyticsNoticeVersion: 0,
   studioTargetPrograms: null,
   studioTargetsBySession: {},
+  customProviders: [],
 };
 
 export const AppConfigPatchSchema = Schema.partial(AppConfigSchema);
@@ -141,4 +164,5 @@ export interface DesktopApi {
    * tells the main process the window is ready, which flushes errors buffered until then.
    */
   onMainError(listener: (report: MainErrorReport) => void): () => void;
+  testCustomEndpoint(baseUrl: string, apiKey: string): Promise<CustomEndpointTestResult>;
 }

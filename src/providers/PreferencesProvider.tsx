@@ -19,6 +19,7 @@ import {
 import { type AppConfig, loadConfig, patchConfig } from "@/lib/config";
 import { qk } from "@/lib/queryKeys";
 import { splitModelKey } from "@/lib/splitModelKey";
+import type { CustomProvider } from "@/types/desktop";
 
 interface PreferencesContextValue {
   selectedModel: string | null;
@@ -26,11 +27,15 @@ interface PreferencesContextValue {
   selectedVariant: string | null;
   hiddenModels: Set<string>;
   detailedAnalyticsEnabled: boolean;
+  customProviders: CustomProvider[];
   setSelectedModel: (modelID: string) => void;
   setSelectedAgent: (name: string) => void;
   setSelectedVariant: (variant: string | null) => void;
   toggleModelVisibility: (modelKey: string) => void;
   setDetailedAnalyticsEnabled: (enabled: boolean) => void;
+  addCustomProvider: (provider: Omit<CustomProvider, "id">) => void;
+  updateCustomProvider: (id: string, patch: Partial<CustomProvider>) => void;
+  removeCustomProvider: (id: string) => void;
 }
 
 export const PreferencesContext = createContext<PreferencesContextValue | undefined>(undefined);
@@ -53,6 +58,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [hiddenModels, setHiddenModels] = useState<Set<string>>(new Set());
   const [detailedAnalyticsEnabled, setDetailedAnalyticsEnabledState] = useState(false);
   const detailedAnalyticsEnabledRef = useRef(false);
+  const [customProviders, setCustomProviders] = useState<CustomProvider[]>([]);
 
   const connectedProviders = useConnectedProviders();
 
@@ -72,6 +78,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!configData) return;
     setHiddenModels(new Set(configData.hiddenModels));
+    setCustomProviders(configData.customProviders ?? []);
 
     // Model usage metrics moved from opt-in to opt-out in notice version 1. Choices
     // recorded under the old consent prompt (including clickaways) do not carry
@@ -167,6 +174,32 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     [hiddenModels],
   );
 
+  const addCustomProvider = useCallback((provider: Omit<CustomProvider, "id">) => {
+    const id = crypto.randomUUID();
+    const newProvider: CustomProvider = { ...provider, id };
+    setCustomProviders((prev) => {
+      const next = [...prev, newProvider];
+      patchConfig({ customProviders: next }).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const updateCustomProvider = useCallback((id: string, patch: Partial<CustomProvider>) => {
+    setCustomProviders((prev) => {
+      const next = prev.map((cp) => (cp.id === id ? { ...cp, ...patch } : cp));
+      patchConfig({ customProviders: next }).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const removeCustomProvider = useCallback((id: string) => {
+    setCustomProviders((prev) => {
+      const next = prev.filter((cp) => cp.id !== id);
+      patchConfig({ customProviders: next }).catch(() => {});
+      return next;
+    });
+  }, []);
+
   const value = useMemo<PreferencesContextValue>(
     () => ({
       selectedModel,
@@ -174,11 +207,15 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       selectedVariant,
       hiddenModels,
       detailedAnalyticsEnabled,
+      customProviders,
       setSelectedModel,
       setSelectedAgent,
       setSelectedVariant,
       toggleModelVisibility,
       setDetailedAnalyticsEnabled,
+      addCustomProvider,
+      updateCustomProvider,
+      removeCustomProvider,
     }),
     [
       selectedModel,
@@ -186,11 +223,15 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       selectedVariant,
       hiddenModels,
       detailedAnalyticsEnabled,
+      customProviders,
       setSelectedModel,
       setSelectedAgent,
       setSelectedVariant,
       toggleModelVisibility,
       setDetailedAnalyticsEnabled,
+      addCustomProvider,
+      updateCustomProvider,
+      removeCustomProvider,
     ],
   );
 

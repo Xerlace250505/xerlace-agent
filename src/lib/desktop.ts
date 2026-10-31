@@ -8,6 +8,8 @@ import {
   type AppConfig,
   AppConfigPatchSchema,
   AppConfigSchema,
+  CustomEndpointTestResultSchema,
+  type CustomEndpointTestResult,
   DEFAULT_APP_CONFIG,
   type DesktopApi,
   type InstructionFile,
@@ -75,6 +77,10 @@ interface DesktopEffects {
     targetKey: string,
   ) => Effect.Effect<StudioTargetSelection, DesktopError>;
   readonly getBloxBotPrograms: Effect.Effect<BloxBotProgramManifest | null, DesktopError>;
+  readonly testCustomEndpoint: (
+    baseUrl: string,
+    apiKey: string,
+  ) => Effect.Effect<CustomEndpointTestResult, DesktopError>;
 }
 
 type StartupProgressListener = (progress: OpenCodeStartupProgress) => void;
@@ -151,41 +157,64 @@ const browserEffects: DesktopEffects = {
       new DesktopError({ message: "Studio targets are only available in the desktop app." }),
     ),
   getBloxBotPrograms: Effect.succeed(null),
+  testCustomEndpoint: (baseUrl, apiKey) =>
+    Effect.tryPromise({
+      try: async () => {
+        const cleanBase = (baseUrl || "").trim().replace(/\/+$/, "");
+        if (!cleanBase) return { ok: false, error: "Base URL is required" };
+        const res = await fetch(`${cleanBase}/models`, {
+          headers: apiKey?.trim() ? { Authorization: `Bearer ${apiKey.trim()}` } : {},
+        });
+        if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+        const json = (await res.json()) as { data?: Array<{ id?: string }> };
+        const models = Array.isArray(json?.data)
+          ? json.data
+              .map((m) => m?.id)
+              .filter((id): id is string => typeof id === "string" && id.trim() !== "")
+          : [];
+        return { ok: true, models };
+      },
+      catch: (cause) =>
+        new DesktopError({
+          message: cause instanceof Error ? cause.message : "Connection failed",
+        }),
+    }).pipe(
+      Effect.catchAll((err) =>
+        Effect.succeed({ ok: false, error: err.message || "Connection failed" }),
+      ),
+    ),
 };
 
-const invoke = <A>(message: string, operation: () => Promise<A>) =>
+const invoke = <A>(message: string, evaluate: () => Promise<A>): Effect.Effect<A, DesktopError> =>
   Effect.tryPromise({
-    try: operation,
-    catch: (cause) =>
-      new DesktopError({
-        message: cause instanceof Error ? `${message}: ${cause.message}` : message,
-        cause,
-      }),
+    try: evaluate,
+    catch: (cause) => new DesktopError({ message, cause }),
   });
 
 const decodeBridgeValue =
   <A, I>(message: string, schema: Schema.Schema<A, I>) =>
-  <E>(effect: Effect.Effect<unknown, E>) =>
+  (effect: Effect.Effect<I, DesktopError>): Effect.Effect<A, DesktopError> =>
     effect.pipe(
-      Effect.flatMap(Schema.decodeUnknown(schema)),
-      Effect.mapError((cause) =>
-        cause instanceof DesktopError ? cause : new DesktopError({ message, cause }),
+      Effect.flatMap((value) =>
+        Schema.decodeUnknown(schema)(value).pipe(
+          Effect.mapError((cause) => new DesktopError({ message, cause })),
+        ),
       ),
     );
 
 function makeBridgeEffects(api: DesktopApi): DesktopEffects {
   return {
     compileExplorerProgram: (program) =>
-      invoke("Failed to compile Explorer program", () => api.compileExplorerProgram(program)).pipe(
-        decodeBridgeValue("Explorer program artifact is invalid", GeneratedProgramArtifactSchema),
-      ),
-    getOpenCodeInfo: invoke("Failed to get OpenCode connection details", () =>
-      api.getOpenCodeInfo(),
-    ).pipe(decodeBridgeValue("OpenCode connection details are invalid", OpenCodeInfoSchema)),
-    getOpenCodeInstallFolder: invoke("Failed to get the OpenCode folder", () =>
+      invoke("Failed to compile Explorer program", () =>
+        api.compileExplorerProgram(program),
+      ).pipe(decodeBridgeValue("Explorer program is invalid", GeneratedProgramArtifactSchema)),
+    getOpenCodeInfo: invoke("Failed to get OpenCode details", () => api.getOpenCodeInfo()).pipe(
+      decodeBridgeValue("OpenCode details are invalid", OpenCodeInfoSchema),
+    ),
+    getOpenCodeInstallFolder: invoke("Failed to get OpenCode folder", () =>
       api.getOpenCodeInstallFolder(),
     ).pipe(decodeBridgeValue("OpenCode folder is invalid", Schema.NullOr(Schema.String))),
-    getStudioMcpStatus: invoke("Failed to get the Studio MCP status", () =>
+    getStudioMcpStatus: invoke("Failed to get Studio MCP status", () =>
       api.getStudioMcpStatus(),
     ).pipe(decodeBridgeValue("Studio MCP status is invalid", StudioMcpStatusSchema)),
     getVersion: invoke("Failed to get the app version", () => api.getVersion()).pipe(
@@ -231,6 +260,10 @@ function makeBridgeEffects(api: DesktopApi): DesktopEffects {
         Schema.NullOr(BloxBotProgramManifestSchema),
       ),
     ),
+    testCustomEndpoint: (baseUrl, apiKey) =>
+      invoke("Failed to test custom endpoint", () => api.testCustomEndpoint(baseUrl, apiKey)).pipe(
+        decodeBridgeValue("Endpoint test result is invalid", CustomEndpointTestResultSchema),
+      ),
   };
 }
 
@@ -269,4 +302,6 @@ export const desktop: DesktopApi = {
   onBloxBotProgramsUpdated: (listener) =>
     window.bloxbot?.onBloxBotProgramsUpdated(listener) ?? (() => {}),
   onMainError: (listener) => window.bloxbot?.onMainError(listener) ?? (() => {}),
+  testCustomEndpoint: (baseUrl, apiKey) =>
+    runPromise(desktopEffects.testCustomEndpoint(baseUrl, apiKey)),
 };
