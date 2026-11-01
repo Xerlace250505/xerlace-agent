@@ -1,50 +1,34 @@
-# BloxBot
+# Xerlace Agent
 
-AI-assisted Roblox development. BloxBot is a free, open-source desktop app that connects any AI model to Roblox Studio's official MCP server, so you can build games by describing what you want.
+AI-assisted Roblox development with custom model reseller & proxy support. **Xerlace Agent** is a free, open-source desktop app that connects any AI model (including custom OpenAI-compatible resellers, local LLMs like Ollama, DeepSeek, Groq, OpenRouter, etc.) to Roblox Studio's official MCP server, so you can build games by describing what you want.
 
-**[Download the latest release](https://github.com/paralov/app-bloxbot-ai/releases/latest)** | **[Website](https://bloxbot.ai)**
+## Key Features
 
-## What it does
-
-- Chat with AI models (Claude, GPT, Gemini, and more) that can read and modify your Roblox Studio project in real time
-- Create scripts, build UI, manipulate the explorer hierarchy, edit properties  - all through natural language
-- Uses Roblox Studio's [built-in MCP server](https://create.roblox.com/docs/studio/mcp), giving the AI structured access to Studio. No plugins to install
-- Bring your own API key from any supported provider, or connect via OAuth
+- **Custom Model Reseller / Proxy Base URL Support**: Add any OpenAI-compatible provider with custom `Base URL`, `API Key`, and `Model IDs`.
+- **CORS-Free Endpoint Testing & Auto-Fetch**: Test reseller connection directly from the desktop main process without browser CORS restrictions, and auto-fetch model lists with one click.
+- **Full Roblox Studio MCP Integration**: AI models can read, inspect, create scripts, build UI, manipulate Explorer hierarchy, and edit properties in real time through Roblox Studio's official MCP server.
+- **Multi-Provider Support**: Supports OpenAI, Anthropic Claude, Google Gemini, Groq, DeepSeek, OpenRouter, Together AI, local Ollama, and any third-party reseller proxy.
+- **Local Storage & Persistence**: Custom providers are securely stored locally and automatically configured into the OpenCode execution engine.
 
 ## How it works
 
-BloxBot connects two things:
+Xerlace Agent connects:
 
-1. **A desktop app** (Electron, Effect, and React) where you chat with AI
-2. **An AI server** ([OpenCode](https://github.com/anomalyco/opencode)) that manages model connections, sessions, and tool use
+1. **A desktop app** (Electron, Effect, and React) where you chat with AI and configure custom reseller providers.
+2. **An AI engine** ([OpenCode](https://github.com/anomalyco/opencode)) that manages model connections, sessions, and tool calling.
+3. **Roblox Studio MCP Server**: Built-in MCP server in Roblox Studio that executes Lua code and modifies your Studio place safely.
 
-The AI connects to Roblox Studio through its official built-in MCP server. When you type a message, the AI uses MCP tools to directly inspect and modify your open Studio project.
+## Setup & Quick Start
 
-## Installation
-
-Download the installer for your platform from the [releases page](https://github.com/paralov/app-bloxbot-ai/releases/latest):
-
-| Platform | File |
-|----------|------|
-| macOS (Apple Silicon and Intel) | `BloxBot-x.y.z-mac.dmg` |
-| Windows (64-bit) | `BloxBot-Setup-x.y.z.exe` |
-| Debian / Ubuntu (64-bit) | `BloxBot-x.y.z-linux-amd64.deb` |
-
-### Setup
-
-1. Install and open BloxBot
-2. Open Roblox Studio and open (or create) a place
-3. In Studio, open **Assistant** settings (three-dot menu) → **MCP Servers** → enable **Studio as MCP server**
-4. Connect an AI provider in BloxBot's Settings → Providers
-5. Start building
-
-### Platform notes
-
-**macOS**: The app is signed and notarized. Open the `.dmg` and drag BloxBot to Applications.
-
-**Windows**: From v0.13.7, the installer and app are signed by Paralov AS. SmartScreen may still warn about a new release for a while. Click "More info" then "Run anyway".
-
-**Linux**: Install the `.deb` with your software center or `sudo apt install ./BloxBot-*.deb`.
+1. Install and launch **Xerlace Agent**.
+2. Open Roblox Studio and open (or create) a place.
+3. In Studio, open **Assistant** settings (three-dot menu) → **MCP Servers** → enable **Studio as MCP server**.
+4. In Xerlace Agent:
+   - Go to **Settings (gear icon)** → **Custom APIs** tab.
+   - Click a preset (e.g. DeepSeek, OpenRouter, Ollama) or enter your reseller's `Base URL` and `API Key`.
+   - Click **Test Connection & Fetch Models**, then **Auto-fill Models** and **Save Provider**.
+   - Click **Restart Now** on the prompt.
+5. In the chat interface, select your custom model from the picker and start building!
 
 ## Development
 
@@ -56,36 +40,14 @@ Download the installer for your platform from the [releases page](https://github
 ### Setup
 
 ```sh
-# Install frontend dependencies
+# Install dependencies
 pnpm install
 
 # Run in development mode
 pnpm dev
-```
 
-Production builds require `VITE_POSTHOG_PROJECT_TOKEN`. Copy `.env.example` to
-`.env.local` for local packaging. GitHub Actions injects the public project token
-from the `POSTHOG_PROJECT_TOKEN` repository variable when building release artifacts.
-
-On first launch, BloxBot downloads the newest compatible OpenCode `1.x.x`
-release and verifies its SHA-256 digest. Later launches check for compatible
-minor and patch updates and can fall back to the newest verified cached copy
-when offline.
-
-### Project structure
-
-```
-src/                    # React/TypeScript frontend
-  components/           #   UI components (Chat, Settings, Sidebar, etc.)
-  hooks/                #   React Query hooks (queries + mutations)
-  lib/                  #   Pure utilities (sseDispatch, queryKeys, splitModelKey)
-  providers/            #   Context providers (OpenCodeClient, ActiveSession, Preferences)
-  test/                 #   Test setup and utilities
-electron/               # Electron main process and preload bridge
-  icons/                #   Desktop installer icons
-  main.ts               #   Secure window, IPC, updates, and lifecycle
-  services/OpenCodeBinary.ts # Runtime download and verified per-user cache
-  services/OpenCode.ts  #   Effect-scoped OpenCode process lifecycle
+# Build production installers (.exe NSIS)
+pnpm package
 ```
 
 ### Key commands
@@ -93,10 +55,10 @@ electron/               # Electron main process and preload bridge
 | Command | Description |
 |---------|-------------|
 | `pnpm dev` | Run the full app in dev mode |
-| `pnpm package` | Production build and installers |
-| `pnpm test` | Run all tests |
+| `pnpm package` | Build production desktop installer (`release/Xerlace-Agent-Setup-*.exe`) |
+| `pnpm build` | Compile TypeScript and Vite bundles |
 | `pnpm typecheck` | Type-check app, Electron, and release scripts |
-| `pnpm lint` | Lint frontend code (Biome) |
+| `pnpm test` | Run test suite |
 
 ## Tech stack
 
@@ -104,7 +66,6 @@ electron/               # Electron main process and preload bridge
 - **Desktop runtime**: Electron with Effect-managed services
 - **AI engine**: [OpenCode](https://opencode.ai)
 - **Studio integration**: [Roblox Studio MCP](https://create.roblox.com/docs/studio/mcp) (built-in)
-- **Testing**: Vitest, React Testing Library
 
 ## License
 
