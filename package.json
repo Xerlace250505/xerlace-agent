@@ -13,7 +13,7 @@
   "homepage": "https://bloxbot.ai",
   "repository": {
     "type": "git",
-    "url": "https://github.com/paralov/app-bloxbot-ai.git"
+    "url": "https://github.com/Xerlace250505/xerlace-agent.git"
   },
   "scripts": {
     "dev": "vite",
