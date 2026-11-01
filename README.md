@@ -2,6 +2,8 @@
 
 AI-assisted Roblox development with custom model reseller & proxy support. **Xerlace Agent** is a free, open-source desktop app that connects any AI model (including custom OpenAI-compatible resellers, local LLMs like Ollama, DeepSeek, Groq, OpenRouter, etc.) to Roblox Studio's official MCP server, so you can build games by describing what you want.
 
+**[⬇️ Download Windows Installer (.exe)](https://github.com/Xerlace250505/xerlace-agent/releases/latest)**
+
 ## Key Features
 
 - **Custom Model Reseller / Proxy Base URL Support**: Add any OpenAI-compatible provider with custom `Base URL`, `API Key`, and `Model IDs`.
